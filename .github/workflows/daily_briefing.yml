@@ -1,0 +1,239 @@
+# ============================================================
+# RWA 创业信息简报系统 - GitHub Actions 每日自动运行工作流
+# ============================================================
+# 功能：
+#   1. 每日定时运行（北京时间09:00 = UTC 01:00）
+#   2. 运行主脚本，生成Markdown简报
+#   3. 通过SMTP发送邮件到指定收件人
+#   4. 将生成的简报和趋势数据commit回仓库，作为历史存档
+#   5. 重大事件模式下，如果有高优先级事件会立即触发额外推送
+# ============================================================
+
+name: RWA Daily Briefing
+
+# 触发条件
+on:
+  # 1. 定时调度（每日北京时间 09:00 左右）
+  schedule:
+    # UTC 01:00 = 北京时间 09:00
+    - cron: '0 1 * * *'
+    # 额外的每周汇总（北京时间周一 09:00，如果config配置了weekly模式）
+    - cron: '30 1 * * 1'
+
+  # 2. 允许手动触发（用于测试）
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '推送模式'
+        required: false
+        default: 'daily'
+        type: choice
+        options:
+          - daily
+          - major_only
+          - weekly
+      lookback_hours:
+        description: '回溯小时数'
+        required: false
+        default: '48'
+        type: string
+
+  # 3. 推送配置变更时触发（验证配置正确性）
+  push:
+    paths:
+      - 'config.yaml'
+      - 'src/**'
+      - 'main.py'
+
+# 环境变量
+env:
+  CONFIG_PATH: config.yaml
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  # ========== Job 1: 每日简报 ==========
+  run-briefing:
+    name: 生成并推送 RWA 简报
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # 允许 commit 回写历史数据
+      issues: read
+
+    steps:
+      - name: Checkout 仓库代码
+        uses: actions/checkout@v4
+        with:
+          # 拉取完整历史以便提交趋势数据
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: 设置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 安装 Python 依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # ---- 预检查步骤：推送模式判断 ----
+      - name: 确定今日推送模式
+        id: determine_mode
+        shell: python
+        run: |
+          import sys, yaml
+          from datetime import datetime, timezone, timedelta
+
+          with open("config.yaml", "r", encoding="utf-8") as f:
+              cfg = yaml.safe_load(f)
+
+          push_cfg = cfg.get("push", {})
+          freq = push_cfg.get("frequency", "daily")
+          run_day_weekly = push_cfg.get("weekly_run_day", 0)
+
+          now = datetime.now(timezone.utc)
+          weekday = now.weekday()  # 0=周一
+          is_schedule = "${{ github.event_name }}" == "schedule"
+          is_manual = "${{ github.event_name }}" == "workflow_dispatch"
+
+          final_mode = freq  # 默认使用配置的频率
+          if is_manual:
+              final_mode = "${{ github.event.inputs.mode }}" or freq
+              print(f"手动触发模式: {final_mode}")
+          elif is_schedule:
+              cron_value = "${{ github.schedule_schedule }}"
+              if cron_value and "30 1 * * 1" in cron_value:
+                  # 第二个 cron (每周一 01:30)，强制 weekly
+                  if freq == "weekly" or weekday == run_day_weekly:
+                      final_mode = "weekly"
+                      print(f"触发每周汇总任务")
+                  else:
+                      final_mode = "skip"
+                      print("非weekly模式或非指定运行日，跳过weekly job")
+              else:
+                  # 每日cron
+                  if freq == "daily":
+                      final_mode = "daily"
+                  elif freq == "major_only":
+                      final_mode = "major_only"
+                  elif freq == "weekly":
+                      # 每日cron下，weekly模式如果今天就是每周运行日才执行
+                      if weekday == run_day_weekly:
+                          final_mode = "weekly"
+                      else:
+                          final_mode = "skip"
+                          print(f"weekly模式，今日(weekday={weekday})不是指定运行日(run_day={run_day_weekly})，跳过")
+
+          # 写回输出
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"mode={final_mode}\n")
+              f.write(f"should_continue={'false' if final_mode == 'skip' else 'true'}\n")
+
+      # ---- 核心：运行简报生成脚本 ----
+      - name: 运行 RWA 简报生成脚本
+        if: steps.determine_mode.outputs.should_continue == 'true'
+        id: run_script
+        env:
+          # 邮件凭据（从GitHub Secrets读取）
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        run: |
+          MODE="${{ steps.determine_mode.outputs.mode }}"
+          LOOKBACK="${{ github.event.inputs.lookback_hours || 48 }}"
+
+          echo "Running in mode: $MODE, lookback: $LOOKBACK hours"
+
+          python main.py \
+            --mode "$MODE" \
+            --lookback-hours "$LOOKBACK" \
+            --config config.yaml
+
+          EXIT_CODE=$?
+          echo "Script exit code: $EXIT_CODE"
+
+          # 检查是否生成了简报
+          if ls output/*.md 1>/dev/null 2>&1; then
+              LATEST=$(ls -t output/*.md | head -n1)
+              echo "latest_briefing=$LATEST" >> $GITHUB_OUTPUT
+              echo "Briefing generated: $LATEST"
+          else
+              echo "No briefing files generated"
+          fi
+
+          exit $EXIT_CODE
+
+      # ---- 将生成的历史数据提交回仓库 ----
+      - name: 保存趋势数据和简报历史
+        if: steps.determine_mode.outputs.should_continue == 'true'
+        continue-on-error: true
+        run: |
+          # 配置git
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          # 检查是否有变更 (使用 -f 强制添加被 .gitignore 忽略的每日存档文件)
+          git add -f output/*.md 2>/dev/null || true
+          git add -f data/tag_trends.json 2>/dev/null || true
+
+          if ! git diff --cached --quiet; then
+              TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+              git commit -m "📰 auto: RWA简报存档 ${TIMESTAMP}
+
+              - 保存生成的Markdown简报
+              - 更新标签趋势数据 (tag_trends.json)
+
+              [skip ci]"
+              git push
+              echo "历史数据已存档"
+          else
+              echo "无数据变更，跳过存档"
+          fi
+
+      # ---- 输出简报到Actions Summary（方便在网页预览） ----
+      - name: 在 Actions Summary 中展示简报预览
+        if: steps.determine_mode.outputs.should_continue == 'true' && steps.run_script.outputs.latest_briefing
+        run: |
+          BRIEFING_FILE="${{ steps.run_script.outputs.latest_briefing }}"
+          echo "### 📰 最新一期 RWA 简报预览" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f "$BRIEFING_FILE" ]; then
+              # 只展示前200行，避免summary过长
+              head -n 200 "$BRIEFING_FILE" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "---" >> $GITHUB_STEP_SUMMARY
+              echo "> 👆 以上为预览，完整内容请查看邮件或仓库 output/ 目录" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ========== Job 2: 配置校验（推送config时运行） ==========
+  validate-config:
+    name: 校验 config.yaml 配置格式
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && contains(github.event.head_commit.modified, 'config.yaml')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装 PyYAML
+        run: pip install pyyaml
+
+      - name: 运行配置校验脚本
+        shell: python
+        run: |
+          import yaml, sys
+          from src.config_loader import load_config, _validate_config
+
+          try:
+              config = load_config("config.yaml")
+              print("✅ config.yaml 格式正确")
+              print(f"   - 关注协议: {len(config['WATCHLIST_PROTOCOLS'])} 个")
+              print(f"   - 监管区域: {len(config['REGIONS_WATCHLIST'])} 个")
+              print(f"   - 叙事标签: {len(config['NARRATIVE_TAGS'])} 个")
+              print(f"   - 推送频率: {config['push']['frequency']}")
+              print(f"   - 融资重大阈值: ${config['FUNDING_THRESHOLD']['MAJOR']:,}万美元")
+          except Exception as e:
+              print(f"❌ 配置文件错误: {e}", file=sys.stderr)
+              sys.exit(1)

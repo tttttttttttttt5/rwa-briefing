@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 邮件凭据/环境变量
+.env
+.env.local
+
+# 运行产物 - 每日简报和趋势数据由GitHub Actions自动commit
+# 忽略本地测试产生的输出文件，但Actions会force-add新增的每日存档
+output/briefing_*.md
+output/latest.md
+
+# 日志
+*.log
+logs/
+
+# 临时文件
+tmp/
+temp/
+*.tmp

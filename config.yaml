@@ -1,0 +1,225 @@
+# ============================================================
+# RWA 创业信息简报系统 - 配置文件
+# 直接修改此文件即可调整系统行为，无需改代码
+# ============================================================
+
+# ---------- 推送设置 ----------
+push:
+  # 推送频率: daily(每日) | major_only(仅重大事件) | weekly(每周汇总)
+  frequency: "daily"
+  # 每日推送时间 (24小时制, UTC时间)
+  daily_run_time: "01:00"  # UTC 01:00 = 北京时间 09:00
+  # 每周推送日 (仅frequency=weekly时生效): 0=周一, 6=周日
+  weekly_run_day: 0
+  weekly_run_time: "01:00"
+  # 邮件接收人列表
+  email_recipients:
+    - "zhang200202409@126.com"
+  # 邮件发送者配置 (126邮箱: smtp.126.com, SSL端口465 / TLS端口25)
+  email_sender:
+    smtp_host: "smtp.126.com"
+    smtp_port: 465
+    smtp_user_env: "SMTP_USER"       # 环境变量名 (值=完整邮箱地址)
+    smtp_password_env: "SMTP_PASSWORD"  # 环境变量名 (值=126授权码, 不是登录密码)
+
+# ---------- 关注的协议列表 ----------
+# 添加的协议如有新动态，自动标记为"高优先级"
+WATCHLIST_PROTOCOLS:
+  - name: "Morpho"
+    category: "借贷协议"
+    priority_boost: true
+  - name: "Hyperliquid"
+    category: "衍生品DEX"
+    priority_boost: true
+  - name: "Ostium"
+    category: "RWA交易平台"
+    priority_boost: true
+  - name: "Stork"
+    category: "预言机"
+    priority_boost: true
+  - name: "Centrifuge"
+    category: "资产代币化"
+    priority_boost: true
+  - name: "Maple Finance"
+    category: "机构信贷"
+    priority_boost: true
+  - name: "TrueFi"
+    category: "无抵押借贷"
+    priority_boost: false
+  - name: "Goldfinch"
+    category: "现实世界信贷"
+    priority_boost: true
+  - name: "Clearpool"
+    category: "机构借贷池"
+    priority_boost: false
+  - name: "Frax"
+    category: "稳定币/RWA"
+    priority_boost: true
+  - name: "Ondo Finance"
+    category: "RWA代币化"
+    priority_boost: true
+  - name: "BlackRock BUIDL"
+    category: "机构RWA基金"
+    priority_boost: true
+
+# ---------- 融资规模阈值 (万美元) ----------
+# 超过阈值的融资事件自动标记为"重大"
+FUNDING_THRESHOLD:
+  CRITICAL: 5000    # >5000万美元: 极度重大
+  MAJOR: 1000       # >1000万美元: 重大
+  MODERATE: 300     # >300万美元: 中等
+  # 低于 MODERATE 的视为小额融资
+
+# ---------- 监管区域列表 ----------
+# 关注的司法管辖区，新政策自动推送
+REGIONS_WATCHLIST:
+  - name: "香港"
+    code: "HK"
+    priority: "high"
+  - name: "新加坡"
+    code: "SG"
+    priority: "high"
+  - name: "瑞士"
+    code: "CH"
+    priority: "medium"
+  - name: "美国"
+    code: "US"
+    priority: "high"
+  - name: "欧盟"
+    code: "EU"
+    priority: "medium"
+  - name: "日本"
+    code: "JP"
+    priority: "medium"
+  - name: "韩国"
+    code: "KR"
+    priority: "low"
+  - name: "迪拜"
+    code: "AE"
+    priority: "medium"
+
+# ---------- 叙事标签系统 ----------
+# 每个事件会被自动匹配以下标签，系统统计出现频率和趋势
+NARRATIVE_TAGS:
+  - tag: "定价"
+    keywords: ["pricing", "oracle", "估值", "定价", "价格发现", "quote", "mark-to-market"]
+    description: "资产定价、预言机、估值方法相关"
+  - tag: "流动性"
+    keywords: ["liquidity", "流动性", "做市", "AMM", "交易深度", "交易量", "volume"]
+    description: "流动性提供、做市、交易深度相关"
+  - tag: "合规"
+    keywords: ["compliance", "合规", "监管", "KYC", "AML", "牌照", "license", "MiCA", "证券法"]
+    description: "合规框架、监管政策、牌照申请相关"
+  - tag: "基础设施"
+    keywords: ["infrastructure", "基础设施", "托管", "custody", "结算", "清算", "settlement", "钱包"]
+    description: "托管、结算、清算等底层设施相关"
+  - tag: "收益产品"
+    keywords: ["yield", "收益", "理财", "储蓄", "APY", "interest", "固定收益", "债券"]
+    description: "固定收益、理财产品、生息资产相关"
+  - tag: "代币化"
+    keywords: ["tokenization", "代币化", "tokenize", "RWA", "真实世界资产", "房产", "国债", "T-Bill"]
+    description: "实物资产代币化相关"
+  - tag: "融资"
+    keywords: ["funding", "融资", "investment", "投资", "raise", "领投", "跟投", "创投"]
+    description: "项目融资、投资事件相关"
+  - tag: "机构动向"
+    keywords: ["institutional", "机构", "银行", "BlackRock", "Fidelity", "高盛", "Goldman", "资管"]
+    description: "传统金融机构入场、合作相关"
+  - tag: "稳定币"
+    keywords: ["stablecoin", "稳定币", "USDC", "USDT", "法币通道", "on-ramp", "off-ramp"]
+    description: "稳定币发行、储备、监管相关"
+  - tag: "信贷"
+    keywords: ["credit", "信贷", "贷款", "借贷", "lending", "风控", "underwriting"]
+    description: "信贷评估、贷款发放、风控相关"
+
+# ---------- 重要程度判断规则 ----------
+# 系统将综合以下规则给每个事件打分，然后映射到高/中/低
+IMPORTANCE_RULES:
+  # 权重配置 (0-100)
+  weights:
+    watchlist_protocol: 40      # 命中关注协议
+    funding_threshold: 30       # 融资规模
+    region_policy: 25           # 关注区域监管
+    big_institution: 35         # 大机构动向
+    narrative_trend: 15         # 是否属于当前热门叙事
+
+  # 评分阈值 (总分 = 各条件加权求和)
+  thresholds:
+    HIGH: 70     # >=70: 高优先级(头条)
+    MEDIUM: 35   # >=35: 中优先级
+    # <35: 低优先级
+
+  # 大机构名单 (提及这些机构加分)
+  BIG_INSTITUTIONS:
+    - "BlackRock"
+    - "Fidelity"
+    - "Goldman Sachs"
+    - "高盛"
+    - "JPMorgan"
+    - "摩根大通"
+    - "Morgan Stanley"
+    - "摩根士丹利"
+    - "BNY Mellon"
+    - "纽约梅隆"
+    - "State Street"
+    - "道富"
+    - "Vanguard"
+    - "领航"
+    - "Schwab"
+    - "嘉信"
+    - "Citi"
+    - "花旗"
+    - "HSBC"
+    - "汇丰"
+    - "Standard Chartered"
+    - "渣打"
+    - "Franklin Templeton"
+    - "贝莱德"
+
+# ---------- 数据源配置 ----------
+data_sources:
+  # RSS订阅源
+  rss_feeds:
+    - name: "CoinDesk"
+      url: "https://www.coindesk.com/arc/outboundfeeds/rss/"
+      category: "media"
+    - name: "The Block"
+      url: "https://www.theblock.co/rss"
+      category: "media"
+    - name: "BlockBeats"
+      url: "https://api.theblockbeats.news/v1/open-api/home-list?type=banner"
+      category: "media"
+    - name: "Cointelegraph"
+      url: "https://cointelegraph.com/rss"
+      category: "media"
+    - name: "Decrypt"
+      url: "https://decrypt.co/feed"
+      category: "media"
+
+  # 搜索关键词 (用于全网搜索补充)
+  search_keywords:
+    - "RWA funding"
+    - "RWA tokenization"
+    - "real world asset crypto"
+    - "代币化 融资"
+    - "RWA 合规"
+    - "stablecoin regulation"
+    - "BlackRock BUIDL"
+    - "tokenized Treasuries"
+
+  # 项目方LinkedIn/官方博客追踪 (手动添加)
+  project_updates:
+    - protocol: "Morpho"
+      url: "https://www.morpho.org/blog"
+    - protocol: "Centrifuge"
+      url: "https://medium.com/centrifuge"
+    - protocol: "Ondo Finance"
+      url: "https://ondo.finance/blog"
+
+# ---------- 趋势分析配置 ----------
+trend_analysis:
+  # 统计过去多少天的标签频率变化
+  lookback_days: 30
+  # 趋势判定阈值 (增长率%)
+  trend_up_threshold: 50     # 标签出现频率增长>50%判定为上升趋势
+  trend_down_threshold: -30  # 标签出现频率下降<-30%判定为下降趋势
