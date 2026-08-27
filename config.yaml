@@ -178,22 +178,22 @@ IMPORTANCE_RULES:
 
 # ---------- 数据源配置 ----------
 data_sources:
-  # RSS订阅源
+  # RSS订阅源 (已验证可用)
   rss_feeds:
-    - name: "CoinDesk"
-      url: "https://www.coindesk.com/arc/outboundfeeds/rss/"
-      category: "media"
-    - name: "The Block"
-      url: "https://www.theblock.co/rss"
-      category: "media"
-    - name: "BlockBeats"
-      url: "https://api.theblockbeats.news/v1/open-api/home-list?type=banner"
-      category: "media"
     - name: "Cointelegraph"
       url: "https://cointelegraph.com/rss"
       category: "media"
     - name: "Decrypt"
       url: "https://decrypt.co/feed"
+      category: "media"
+    - name: "CoinGape"
+      url: "https://www.coingape.com/feed"
+      category: "media"
+    - name: "TheDefiant"
+      url: "https://thedefiant.io/feed"
+      category: "defi"
+    - name: "CryptoBriefing"
+      url: "https://cryptobriefing.com/feed/"
       category: "media"
 
   # 搜索关键词 (用于全网搜索补充)
