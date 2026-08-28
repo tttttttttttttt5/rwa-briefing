@@ -83,7 +83,7 @@ jobs:
         id: determine_mode
         shell: python
         run: |
-          import sys, yaml
+          import os, sys, yaml
           from datetime import datetime, timezone, timedelta
 
           with open("config.yaml", "r", encoding="utf-8") as f:
