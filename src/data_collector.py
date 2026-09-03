@@ -8,6 +8,7 @@ import hashlib
 import logging
 import json
 import urllib.parse
+from difflib import SequenceMatcher
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
@@ -72,12 +73,17 @@ class DataCollector:
         all_events.extend(rss_events)
         logger.info(f"RSS源收集到 {len(rss_events)} 条新闻")
 
-        # 2. WebSearch实时搜索（补充RWA专题新闻）
+        # 2. 网页抓取源（无RSS的专业站点）
+        scrape_events = self._collect_web_scraped(cutoff_time)
+        all_events.extend(scrape_events)
+        logger.info(f"网页抓取源收集到 {len(scrape_events)} 条新闻")
+
+        # 3. WebSearch实时搜索（补充RWA专题新闻）
         web_events = self._collect_websearch_rwa()
         all_events.extend(web_events)
         logger.info(f"WebSearch收集到 {len(web_events)} 条新闻")
 
-        # 去重
+        # 智能去重（模糊标题相似度 + URL域名）
         deduped_events = self._deduplicate_events(all_events)
         logger.info(f"去重后共 {len(deduped_events)} 条新闻")
 
@@ -146,6 +152,77 @@ class DataCollector:
                 events.append(event)
             except Exception as e:
                 logger.debug(f"解析RSS条目失败: {e}")
+                continue
+
+        return events
+
+    def _collect_web_scraped(self, cutoff_time: datetime) -> List[NewsEvent]:
+        """从无RSS的网页源抓取文章列表"""
+        events = []
+        sources = self.config.get("data_sources", {}).get("web_scrape_sources", [])
+
+        for src in sources:
+            try:
+                resp = self.session.get(src["url"], timeout=20)
+                resp.raise_for_status()
+                soup = BeautifulSoup(resp.content, "lxml")
+
+                # 用配置的选择器找文章块
+                articles = soup.select(src.get("article_selector", "article"))
+                if not articles:
+                    # 退而求其次：找所有带链接的标题
+                    articles = soup.find_all(["h2", "h3"], limit=15)
+
+                for art in articles[:15]:
+                    try:
+                        # 提取标题文本
+                        title_el = art.select_one(src.get("title_selector", "h2, h3, a"))
+                        if not title_el:
+                            title_el = art
+
+                        title = title_el.get_text(strip=True)
+                        if not title or len(title) < 10:
+                            continue
+
+                        # 提取链接
+                        link_el = art.find("a")
+                        link = ""
+                        if link_el and link_el.get("href"):
+                            link = urllib.parse.urljoin(src["url"], link_el["href"])
+
+                        # 提取摘要
+                        summary = art.get_text(" ", strip=True)[:500]
+
+                        # 尝试提取日期
+                        pub_date = datetime.now(timezone.utc)
+                        date_el = art.select_one(src.get("date_selector", "time, .date"))
+                        if date_el and date_el.get("datetime"):
+                            try:
+                                pub_date = date_parser.parse(date_el["datetime"])
+                            except Exception:
+                                pass
+
+                        if pub_date < cutoff_time:
+                            continue
+
+                        event_id = self._generate_event_id(title, link or src["url"])
+                        raw_content = title + " " + summary
+
+                        events.append(NewsEvent(
+                            event_id=event_id,
+                            title=title,
+                            summary=summary,
+                            source=src["name"],
+                            url=link or src["url"],
+                            published_at=pub_date,
+                            raw_content=raw_content
+                        ))
+                    except Exception:
+                        continue
+
+                logger.info(f"网页抓取 [{src['name']}]: 获取 {len(articles)} 篇文章")
+            except Exception as e:
+                logger.warning(f"网页抓取失败 [{src.get('name')}]: {e}")
                 continue
 
         return events
@@ -250,20 +327,61 @@ class DataCollector:
         return hashlib.md5(raw).hexdigest()[:12]
 
     def _deduplicate_events(self, events: List[NewsEvent]) -> List[NewsEvent]:
-        """按event_id和标题去重"""
+        """
+        智能去重：event_id + 精确标题 + 模糊标题相似度 + URL路径
+        """
         seen_ids = {}
-        seen_titles = set()
+        seen_titles = []  # 存 (title_lower, url_path, event) 用于模糊比对
 
         for event in events:
             title_lower = event.title.lower().strip()
+
+            # 1. event_id 精确去重
             if event.event_id in seen_ids:
                 if len(event.raw_content) > len(seen_ids[event.event_id].raw_content):
                     seen_ids[event.event_id] = event
-            elif title_lower in seen_titles:
                 continue
-            else:
-                seen_ids[event.event_id] = event
-                seen_titles.add(title_lower)
+
+            # 2. 精确标题匹配
+            exact_match = False
+            for t, _, _ in seen_titles:
+                if t == title_lower:
+                    exact_match = True
+                    break
+            if exact_match:
+                continue
+
+            # 3. 模糊标题相似度去重（>75%视为重复）
+            fuzzy_match = False
+            for t, _, existing_event in seen_titles:
+                ratio = SequenceMatcher(None, t, title_lower).ratio()
+                if ratio > 0.75:
+                    fuzzy_match = True
+                    # 保留内容更丰富的那条
+                    if len(event.raw_content) > len(existing_event.raw_content):
+                        # 替换
+                        for i, (st, su, se) in enumerate(seen_titles):
+                            if st == t:
+                                seen_titles[i] = (title_lower, se.url, event)
+                                seen_ids[se.event_id] = event
+                    break
+            if fuzzy_match:
+                continue
+
+            # 4. URL路径去重（同一篇文章不同来源转载）
+            url_path = urllib.parse.urlparse(event.url).path.rstrip("/")
+            if url_path and len(url_path) > 20:
+                url_dup = False
+                for _, u, _ in seen_titles:
+                    existing_path = urllib.parse.urlparse(u).path.rstrip("/")
+                    if existing_path == url_path:
+                        url_dup = True
+                        break
+                if url_dup:
+                    continue
+
+            seen_ids[event.event_id] = event
+            seen_titles.append((title_lower, event.url, event))
 
         return list(seen_ids.values())
 

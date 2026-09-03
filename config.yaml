@@ -195,6 +195,19 @@ data_sources:
     - name: "CryptoBriefing"
       url: "https://cryptobriefing.com/feed/"
       category: "media"
+    - name: "CFTime"
+      url: "https://cftime.io/feed/"
+      category: "fintech"
+
+  # 网页抓取源（无RSS的站点，通过HTML解析获取文章列表）
+  web_scrape_sources:
+    - name: "RWANewsroom"
+      url: "https://rwanewsroom.com/news/"
+      category: "rwa_specialist"
+      article_selector: "article, .news-item, .post"
+      title_selector: "h2, h3, .entry-title"
+      link_selector: "a"
+      date_selector: ".date, time, .post-date"
 
   # 搜索关键词 (用于全网搜索补充)
   search_keywords:
@@ -206,6 +219,15 @@ data_sources:
     - "stablecoin regulation"
     - "BlackRock BUIDL"
     - "tokenized Treasuries"
+    - "RWA代币化 最新"
+    - "CoinDesk RWA real world assets"
+    - "rwanewsroom tokenization"
+    - "cftime RWA 区块链"
+    - "tokenized stocks"
+    - "Ondo Finance SEC"
+    - "GENIUS Act stablecoin"
+    - "private credit tokenization"
+    - "institutional RWA adoption"
 
   # 项目方LinkedIn/官方博客追踪 (手动添加)
   project_updates:

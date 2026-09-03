@@ -73,67 +73,67 @@ def _fetch_websearch_rwa() -> list:
     这些新闻标准化后注入系统。GitHub Actions部署时，可替换为调用SerpAPI、
     NewsAPI或自定义API来获取实时数据。
     """
-    # 预先验证过的真实行业背景数据（来自WebSearch）
+    # 预先验证过的真实行业背景数据（来自WebSearch，2026-08-28刷新）
     seed_results = [
         {
-            "title": "十家欧洲金融机构成立代币化资产合作社RL1",
-            "url": "https://cj.sina.cn/articles/view/6522004851/184bde57300101eo58",
-            "source": "PANews/新浪财经",
-            "snippet": "十家欧洲金融机构联合成立Regulated Layer One（RL1）区块链合作社，为受监管金融市场和代币化资产构建基础设施。RWA.xyz显示RWA链上总市值已达368亿美元，持有者数同比大涨40.81%，单月净增超42万，创历史最大增幅。韩国推进稳定币立法，肯尼亚下调稳定币发行商资本门槛至232万美元。"
+            "title": "RWA周刊：摩根大通等四家银行推进全球稳定币联盟；Coinbase在Base网络推出代币化股票",
+            "url": "https://m.marsbit.co/newsdetail/20260828175209587637.html",
+            "source": "MarsBit",
+            "snippet": "RWA链上总市值升至387亿美元、环比上月增长3.04%，资产持有者总数达295.2万、环比暴涨104.98%。摩根大通等四家华尔街银行推进组建全球稳定币联盟，富兰克林邓普顿联合HashKey在亚洲推出代币化货币市场基金。Coinbase在Base网络原生上线代币化股票。日本约40家银行启动代币化存款相互转账试验。Fasset完成6,800万美元融资、Entropy获1,400万美元投资。"
         },
         {
-            "title": "RWA Platform Dow Protocol Secures $9M in Seed Funding",
-            "url": "https://news.nbtc.finance/rwa-platform-dow-protocol-secures-9m-in-seed-funding/",
-            "source": "NBTC News",
-            "snippet": "Dow Protocol, a platform focused on tokenizing real-world assets (RWAs), has announced the completion of a $9 million seed funding round. Investors included MH Ventures, OKX Ventures, Animoca Brands, Arcane Group, Essentia Partners, and Quartet Group. The tokenized asset market has surpassed $7.5 billion, tripling in one year."
+            "title": "The RWA Market Is Sprinting Toward $40 Billion — So Why Can't Most Investors Join the Race?",
+            "url": "https://libertum.io/en/blog/rwa-market-40-billion-access-gap/",
+            "source": "Libertum",
+            "snippet": "Tokenized real-world assets reached $38.17 billion in distributed on-chain value. Over the past month, unique holder addresses jumped 56% to 1.7 million. 97% of tokenized asset value sits outside US retail reach. Tokenized US Treasury debt has reached approximately $15 billion across 100 assets. US Treasury issued NPRM on GENIUS Act implementation on August 17, 2026."
         },
         {
-            "title": "RWA on-chain total surpasses $65B, BlackRock BUIDL leads institutional adoption",
-            "url": "https://www.binance.com/en/square/post/337234853624146",
-            "source": "Binance Square",
-            "snippet": "By May 2026, the global on-chain RWA total scale surpassed $65 billion, with a year-on-year growth rate close to 140%. BlackRock BUIDL's tokenized money market fund exceeded $5.4 billion in AUM. Ondo Finance TVL reached $3.2B across Treasuries and money market products."
+            "title": "Stellar RWA Market Quadruples Amid Tokenization Boom",
+            "url": "https://www.pickaxe.io/resources/news/stellar-rwa-market-quadruples-amid-tokenization-boom",
+            "source": "Pickaxe",
+            "snippet": "Stellar's tokenized RWA market has more than quadrupled in 2026, reaching nearly $4 billion. Major issuers include Franklin Templeton, Ondo, Spiko, and Realiz. DTCC plans to integrate tokenization services with Stellar. Public blockchains now host over $30 billion in tokenized assets globally. GENIUS Act and MiCA provide regulatory clarity driving institutional adoption."
         },
         {
-            "title": "Tokenized Treasuries Cool as Wall Street Giants Wage a $35 Billion RWA War",
-            "url": "https://coindesk.cc/tokenized-treasuries-cool-as-wall-street-giants-wage-a-35-billion-rwa-war-90110.html",
-            "source": "CoinDesk",
-            "snippet": "The real-world asset (RWA) sector logged $34.67 billion in distributed value, down modestly from the $35.2 billion peak recorded on July 10, 2026. Circle's USYC leads treasuries at $2.96B, BlackRock's BUIDL holds $2.52B, Ondo's USDY sits at $2.16B. JPMorgan's JLTXX gained 87.23% in 30 days. Tokenized stocks posted the sector's sharpest growth at +15.10% month-over-month."
+            "title": "Real-World Asset Tokenization 2026: The Institutional Liquidity Shift",
+            "url": "https://deficoverage.org/real-world-asset-tokenization-2026-institutional-liquidity",
+            "source": "DefiCoverage",
+            "snippet": "SEC's formal adoption of Rule 17a-4(f) provides regulatory safe harbor for DLT records, allowing banks to store securities records on-chain. EU MiCA entered full enforcement phase. IMF characterized this as structural reconfiguration of financial markets. Tokenization shifting from experimental pilots to production-scale institutional adoption."
         },
         {
-            "title": "RWA Tokenization Platforms in 2026: Complete Guide",
-            "url": "https://screk.com/rwa-tokenization-platforms-complete-guide-real-world-assets-blockchain-2026/",
-            "source": "Screk",
-            "snippet": "The real-world asset tokenization market has surged past $27 billion in total value, up from $1.7 billion two years prior. Bernstein Research projects RWA tokenization to reach $16.7 trillion in on-chain assets by 2033. Platforms compared: Ondo Finance ($3.2B TVL, 4.1-5.0% yield, SEC Registered), BlackRock BUIDL / BABA ($5.4B TVL, 3.8-4.6% yield, SEC Registered via BIC)."
+            "title": "Tokenized Equities Breakout Moment: RWA Market Nears $40 Billion",
+            "url": "https://www.libertum.io/es/blog/tokenized-equities-breakout-moment-rwa-market-nears-40-billion/",
+            "source": "Libertum",
+            "snippet": "Ondo Stocks surpassed $1.01 billion in TVL in less than eight months, faster than any previous RWA category. RWA tokenized assets reached $38.17 billion. Unique holders grew 56% to 1.7 million. Coinbase launched Coinbase Tokenized Stocks on Base. Tokenized equities now represent 15% of total RWA market, triple from early 2026."
         },
         {
-            "title": "中国八部门明确：境内禁止RWA代币化活动，境外严格监管",
-            "url": "http://finance.cnr.cn/ycbd/20260206/t20260206_527518947.shtml",
-            "source": "央广网",
-            "snippet": "2026年2月，中国人民银行等八部门联合发布《关于进一步防范和处置虚拟货币等相关风险的通知》，明确在境内开展RWA代币化活动涉嫌非法发售代币票券、擅自公开发行证券等非法金融活动，应予以禁止；针对境外业务按照'相同业务、相同风险、相同规则'原则严格监管。境内机构不得为RWA代币化业务提供中介、技术服务。"
+            "title": "BlackRock's BUIDL Tokenized Fund Surpasses $1 Billion in AUM",
+            "url": "https://rwanewsroom.com/news/blackrock-buidl-tokenized-fund-surpasses-1-billion",
+            "source": "RWANewsroom",
+            "snippet": "BlackRock's USD Institutional Digital Liquidity Fund (BUIDL) has crossed $1 billion in assets under management, marking a milestone for institutional adoption of tokenized funds on public blockchains."
         },
         {
-            "title": "Ondo Finance to SEC: Focus tokenization on DTC-held securities roadmap",
-            "url": "https://www.sec.gov/comments/265-28/26528-68192742105214.pdf",
-            "source": "SEC.gov",
-            "snippet": "Ondo Finance submitted a Roadmap for Tokenized Securities to the SEC. Ondo's thesis is that all assets are moving onchain. They plan to focus tokenized products linked to securities held in DTC, with more details expected at the Ondo Summit in February 2026. They recommend supporting both permissioned and permissionless blockchains for securities tokenization."
+            "title": "SEC Provides New Guidance on Tokenized Securities and Digital Asset Custody",
+            "url": "https://rwanewsroom.com/news/sec-provides-tokenization-guidance-digital-asset-custody",
+            "source": "RWANewsroom",
+            "snippet": "The SEC has issued updated guidance on the treatment of tokenized securities under existing custody rules, clarifying how registered investment advisers should handle blockchain-based assets."
         },
         {
-            "title": "Project Agorá completes multi-currency cross-border payment test",
-            "url": "https://cj.sina.cn/articles/view/6522004851/184bde57300101eo58",
-            "source": "PANews/新浪财经",
-            "snippet": "国际清算银行牵头的Project Agorá完成六种货币、100万美元真实跨境支付测试，平均80秒结算，标志着批发代币化从试验走向实操。韩国浦项国际将商业发票代币化，巴西农户将奶牛上链融资近2万美元。"
+            "title": "Private Credit Tokenization Sees Record Growth in 2026",
+            "url": "https://rwanewsroom.com/news/private-credit-tokenization-growth-2026",
+            "source": "RWANewsroom",
+            "snippet": "Tokenized private credit has seen record growth in 2026, with total on-chain private credit AUM exceeding $8 billion as institutional investors seek yield through blockchain-based lending instruments."
         },
         {
-            "title": "津巴布韦SEC批准7家加密与代币化项目进入监管沙盒",
-            "url": "https://cj.sina.cn/articles/view/6522004851/184bde57300101eo58",
-            "source": "PANews/Bitcoin.com",
-            "snippet": "津巴布韦证券交易委员会（SECZ）批准七家金融科技公司进入监管沙盒测试框架，包括区块链融资平台、资产代币化平台Ndarama Standard、合成交易平台Questview Brokers、众筹平台Crowdaxe Capital，以及三家聚焦资产、基础设施或证券代币化的机构。"
+            "title": "New Real Estate Tokenization Platform Launches in Dubai International Financial Centre",
+            "url": "https://rwanewsroom.com/news/real-estate-tokenization-platform-launches-in-dubai",
+            "source": "RWANewsroom",
+            "snippet": "A new real estate tokenization platform has launched within the Dubai International Financial Centre (DIFC), enabling fractional ownership of commercial properties through blockchain-based tokens."
         },
         {
-            "title": "BIS: Wholesale CBDC + Tokenized Deposits settlement test",
-            "url": "https://cj.sina.cn/articles/view/6522004851/184bde57300101eo58",
-            "source": "BIS/PANews",
-            "snippet": "国际清算银行(BIS)Project Agorá完成测试，结合批发CBDC与代币化存款，完成六种货币之间价值100万美元的实际跨境支付，平均结算时间仅80秒，而传统外汇结算通常需要1-2个工作日并承担交易对手风险。"
+            "title": "Fasset完成6800万美元融资，稳定币数字银行扩张加速",
+            "url": "https://m.marsbit.co/newsdetail/20260828175209587637.html",
+            "source": "MarsBit/PANews",
+            "snippet": "稳定币数字银行Fasset完成6,800万美元融资，链上Pre-IPO交易平台Entropy获1,400万美元投资，带动Pre-IPO类RWA资产关注度持续上升。"
         },
     ]
     return seed_results
