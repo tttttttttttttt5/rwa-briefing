@@ -47,6 +47,12 @@ class BriefingGenerator:
         # ========== 核心摘要（放最前面，看完就懂） ==========
         lines.append(self._generate_executive_summary(events, trend_summary))
 
+        # ========== 潜在机会与信息差（用户重点关注的盈利机会） ==========
+        lines.append(self._generate_opportunity_section(events, trend_summary))
+
+        # ========== 一句话速览表（扫一眼立刻获取要点） ==========
+        lines.append(self._generate_quick_scan(events))
+
         # ========== 概览统计 ==========
         lines.append(self._generate_overview(events, mode))
 
@@ -181,6 +187,174 @@ class BriefingGenerator:
             lines.append(f"- {s}")
 
         lines.append("")
+        return "\n".join(lines)
+
+    # ============== 一句话速览 ==============
+
+    def _fmt_money(self, amount_wan_usd: float) -> str:
+        """格式化融资金额：>=1亿美元显示为亿美元，否则接受万依回显"""
+        if amount_wan_usd >= 10000:
+            return f"${amount_wan_usd / 10000:.1f}亿"
+        return f"${amount_wan_usd:,.0f}万"
+
+    def _extract_key_point(self, event: NewsEvent) -> str:
+        """从新闻中提炼一句话要点，方便快速扫读"""
+        content = event.raw_content.lower()
+        parts = []
+
+        # 融资要点
+        if event.funding_amount and event.funding_amount > 0:
+            parts.append(f"💰融资{self._fmt_money(event.funding_amount)}")
+
+        # 机构动向要点
+        big_inst = self.config["IMPORTANCE_RULES"]["BIG_INSTITUTIONS"]
+        for inst in big_inst:
+            if inst.lower() in content:
+                parts.append(f"🏦{inst}参与")
+                break
+
+        # 关注协议要点
+        if event.matched_protocols:
+            parts.append(f"🔗{event.matched_protocols[0]}动态")
+
+        # 监管要点
+        if event.matched_regions:
+            region_names = []
+            for code in event.matched_regions:
+                rc = next(
+                    (r for r in self.config["REGIONS_WATCHLIST"] if r["code"] == code),
+                    None
+                )
+                if rc:
+                    region_names.append(rc["name"])
+            if region_names:
+                if "合规" in event.tags:
+                    parts.append(f"🏛️{'、'.join(region_names[:2])}监管变化")
+                else:
+                    parts.append(f"📍{'、'.join(region_names[:2])}相关")
+
+        # 若已有明确要点，用「·」连接，再加一句摘要开头
+        if parts:
+            return " · ".join(parts[:3])
+
+        # 无结构化要点时，用摘要前50字
+        summary = event.summary.strip()
+        if summary:
+            return summary[:50] + ("..." if len(summary) > 50 else "")
+        return event.title[:50]
+
+    def _generate_quick_scan(self, events: List[NewsEvent]) -> str:
+        """生成一句话速览表格 - 高/中优先级扫一眼即懂"""
+        scan_events = [e for e in events if e.importance in ("high", "medium")]
+        if not scan_events:
+            return ""
+
+        lines = []
+        lines.append("## ⚡ 一句话速览")
+        lines.append("")
+        lines.append("> 扫一眼即抓要点：高/中优先级事件的浓缩信息，详情见下方正文")
+        lines.append("")
+        lines.append("| 级别 | 要点 | 来源 |")
+        lines.append("|------|------|------|")
+        for e in scan_events[:25]:
+            icon = "🔴" if e.importance == "high" else "🟡"
+            title = e.title.replace("|", "\\|").replace("`", "")
+            key = self._extract_key_point(e).replace("|", "\\|")
+            lines.append(
+                f"| {icon} | **[{title}]({e.url})**<br>{key} | {e.source} |"
+            )
+        lines.append("")
+        lines.append("")
+        return "\n".join(lines)
+
+    # ============== 潜在机会与信息差 ==============
+
+    def _generate_opportunity_section(
+        self,
+        events: List[NewsEvent],
+        trend_summary: Dict[str, Any]
+    ) -> str:
+        """生成潜在盈利机会与信息差板块 - 提炼可执行的赚钱/布局信号"""
+        lines = []
+        lines.append("## 💰 潜在机会与信息差")
+        lines.append("")
+        lines.append("> 🎯 本期提炼出的可关注机会（基于规则识别，非投资建议，请自行核实）")
+        lines.append("")
+
+        opportunities = []
+
+        # 1. 融资事件 → 代币/空投机会
+        funding_events = [e for e in events if e.funding_amount and e.funding_amount > 0]
+        for e in funding_events[:4]:
+            investors = self._extract_investors(e.summary)
+            inv_suffix = f"（投资方：{investors}）" if investors else ""
+            opportunities.append((
+                "🪙 融资/代币机会",
+                f"「{e.title[:35]}...」完成 {self._fmt_money(e.funding_amount)} 融资{inv_suffix}。"
+                f"关注项目后续的代币发行(TGE)计划、空投活动和上线交易所节奏，"
+                f"早期参与或能获得信息差优势。",
+                e.url
+            ))
+
+        # 2. 关注协议动态 → 生态/治理机会
+        protocol_events = [e for e in events if e.matched_protocols]
+        for e in protocol_events[:3]:
+            opp = (
+                "🔗 协议生态机会",
+                f"关注协议「{e.matched_protocols[0]}」出现新动态：{e.title[:45]}...。"
+                f"可关注其治理提案(DAO)、流动性激励(veToken/points)和生态空投机会，"
+                f"往往是低成本参与早期布局的窗口。",
+                e.url
+            )
+            # 去重避免和融资重复
+            if not any(o[0].startswith("🔗") for o in opportunities):
+                opportunities.append(opp)
+
+        # 3. 机构入场 → 合规/生态布局机会
+        big_inst = self.config["IMPORTANCE_RULES"]["BIG_INSTITUTIONS"]
+        inst_events = [
+            e for e in events
+            if any(inst.lower() in e.raw_content.lower() for inst in big_inst)
+        ]
+        for e in inst_events[:3]:
+            opp = (
+                "🏦 机构布局信号",
+                f"传统机构介入RWA：{e.title[:45]}...。机构大规模入场通常带动"
+                f"合规服务(托管/审计/合规科技)、做市和基础设施需求上升，"
+                f"相关配套赛道存在结构性机会。",
+                e.url
+            )
+            if not any(o[0].startswith("🏦") for o in opportunities):
+                opportunities.append(opp)
+
+        # 4. 叙事上升 → 提前布局方向
+        trending_up = trend_summary.get("trending_up", [])
+        if trending_up:
+            top_tags = "、".join(f"`{t[0]}`(+{t[1]*100:.0f}%)" for t in trending_up[:3])
+            opportunities.append((
+                "📈 叙事前瞻",
+                f"当前叙事热度上升最快的方向：{top_tags}。"
+                f"叙事早期往往是超额收益集中期，可提前研究这些细分赛道"
+                f"的头部项目和潜在Alpha机会。",
+                ""
+            ))
+
+        if not opportunities:
+            lines.append("- 本期暂未识别到明显的结构性机会信号，建议保持观察并关注融资与监管动态。")
+        else:
+            for kind, desc, url in opportunities[:6]:
+                lines.append(f"**{kind}**")
+                lines.append("")
+                lines.append(f"> {desc}")
+                if url:
+                    lines.append(f"> 🔗 [来源链接]({url})")
+                lines.append("")
+
+        lines.append("---")
+        lines.append("")
+        lines.append("> ⚠️ 以上机会基于公开信息规则自动识别，可能存在滞后或误判，请在参与前自行核实项目真实性与合规性。")
+        lines.append("")
+
         return "\n".join(lines)
 
     # ============== 概览统计 ==============
