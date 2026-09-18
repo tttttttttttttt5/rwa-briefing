@@ -3,6 +3,7 @@ RWA 创业信息简报系统
 简报生成模块 - 资深投研视角
 """
 import os
+import re
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any
 from collections import Counter
@@ -95,6 +96,9 @@ class BriefingGenerator:
 
         # ========== 叙事趋势 ==========
         lines.append(self._generate_trend_section(trend_summary, events))
+
+        # ========== RWA现状与产业透视（感受当下/分析/发展） ==========
+        lines.append(self._generate_industry_overview(events, trend_summary))
 
         # ========== 投研总结（放最后，总结全文） ==========
         lines.append(self._generate_research_summary(events, trend_summary))
@@ -274,85 +278,253 @@ class BriefingGenerator:
         events: List[NewsEvent],
         trend_summary: Dict[str, Any]
     ) -> str:
-        """生成潜在盈利机会与信息差板块 - 提炼可执行的赚钱/布局信号"""
+        """
+        生成当下可套利机会板块 - 只收录"现在就能行动"的实际机会
+        (可参与收益、可领取空投、可认购发行), 不做未来式展望
+        """
         lines = []
-        lines.append("## 💰 潜在机会与信息差")
+        lines.append("## 🔁 当下可套利机会")
         lines.append("")
-        lines.append("> 🎯 本期提炼出的可关注机会（基于规则识别，非投资建议，请自行核实）")
+        lines.append("> 🎯 筛选自本期真实新闻中「现在就能行动」的机会（参与前请自行核实，非投资建议）")
         lines.append("")
 
-        opportunities = []
+        # 关联对象文本
+        def text(e):
+            return (e.title + " " + e.summary + " " + e.raw_content).lower()
 
-        # 1. 融资事件 → 代币/空投机会
-        funding_events = [e for e in events if e.funding_amount and e.funding_amount > 0]
-        for e in funding_events[:4]:
-            investors = self._extract_investors(e.summary)
-            inv_suffix = f"（投资方：{investors}）" if investors else ""
-            opportunities.append((
-                "🪙 融资/代币机会",
-                f"「{e.title[:35]}...」完成 {self._fmt_money(e.funding_amount)} 融资{inv_suffix}。"
-                f"关注项目后续的代币发行(TGE)计划、空投活动和上线交易所节奏，"
-                f"早期参与或能获得信息差优势。",
-                e.url
-            ))
+        # 仅当事件确与 RWA/收益/协议相关时才视为可套利信号，避免误报普通新闻
+        def rwa_relevant(e):
+            if e.matched_protocols or e.funding_amount:
+                return True
+            rwa_kw = ["收益", "稳定币", "代币化", "信贷", "借贷", "国债", "债券",
+                      "货币市场", "赎回", "yield", "apy", "treasur", "credit",
+                      "tokenized", "tokeniz", "real world", "机构", "监管", "合规"]
+            t = text(e)
+            return any(k in t for k in rwa_kw)
 
-        # 2. 关注协议动态 → 生态/治理机会
-        protocol_events = [e for e in events if e.matched_protocols]
-        for e in protocol_events[:3]:
-            opp = (
-                "🔗 协议生态机会",
-                f"关注协议「{e.matched_protocols[0]}」出现新动态：{e.title[:45]}...。"
-                f"可关注其治理提案(DAO)、流动性激励(veToken/points)和生态空投机会，"
-                f"往往是低成本参与早期布局的窗口。",
-                e.url
-            )
-            # 去重避免和融资重复
-            if not any(o[0].startswith("🔗") for o in opportunities):
-                opportunities.append(opp)
+        # ---- 1. 收益率套利：当下可直接参与的收益型RWA产品 ----
+        yield_insts = {
+            "usdy": "Ondo USDY",
+            "buidl": "BlackRock BUIDL",
+            "usyc": "Circle USYC/USDC 财富",
+            "ustb": "富兰克林 FOBXX/USTB",
+            "morpho": "Morpho 借贷池",
+            "centrifuge": "Centrifuge 资产池",
+            "maple": "Maple 机构信贷",
+        }
+        yield_hits = []
+        for e in events:
+            t = text(e)
+            for kw, name in yield_insts.items():
+                if kw.lower() in t:
+                    yield_hits.append((name, e))
+                    break
+        if yield_hits:
+            seen_names = set()
+            for name, e in yield_hits[:5]:
+                if name in seen_names:
+                    continue
+                seen_names.add(name)
+                # 尝试提取收益率
+                m = re.search(
+                    r"(\d+(?:\.\d+)?)\s*%", e.summary + " " + e.raw_content
+                )
+                yield_str = f"，文中提到约 {m.group(1)}% 收益" if m else ""
+                lines.append(f"**💵 收益型RWA（可当下参与）**")
+                lines.append("")
+                lines.append(f"> 「{name}」：{e.title[:45]}...{yield_str}")
+                lines.append(f"> 🔗 [来源链接]({e.url})")
+                lines.append("")
 
-        # 3. 机构入场 → 合规/生态布局机会
-        big_inst = self.config["IMPORTANCE_RULES"]["BIG_INSTITUTIONS"]
-        inst_events = [
+        # ---- 2. 空投/积分：当下可领取或积累 ----
+        airdrop_kw = ["airdrop", "空投", "claim", "领取", "points", "积分",
+                      "质押解锁", "激励"]
+        airdrop_events = [
             e for e in events
-            if any(inst.lower() in e.raw_content.lower() for inst in big_inst)
+            if rwa_relevant(e) and any(k in text(e) for k in airdrop_kw)
         ]
-        for e in inst_events[:3]:
-            opp = (
-                "🏦 机构布局信号",
-                f"传统机构介入RWA：{e.title[:45]}...。机构大规模入场通常带动"
-                f"合规服务(托管/审计/合规科技)、做市和基础设施需求上升，"
-                f"相关配套赛道存在结构性机会。",
-                e.url
-            )
-            if not any(o[0].startswith("🏦") for o in opportunities):
-                opportunities.append(opp)
-
-        # 4. 叙事上升 → 提前布局方向
-        trending_up = trend_summary.get("trending_up", [])
-        if trending_up:
-            top_tags = "、".join(f"`{t[0]}`(+{t[1]*100:.0f}%)" for t in trending_up[:3])
-            opportunities.append((
-                "📈 叙事前瞻",
-                f"当前叙事热度上升最快的方向：{top_tags}。"
-                f"叙事早期往往是超额收益集中期，可提前研究这些细分赛道"
-                f"的头部项目和潜在Alpha机会。",
-                ""
-            ))
-
-        if not opportunities:
-            lines.append("- 本期暂未识别到明显的结构性机会信号，建议保持观察并关注融资与监管动态。")
-        else:
-            for kind, desc, url in opportunities[:6]:
-                lines.append(f"**{kind}**")
+        if airdrop_events:
+            for e in airdrop_events[:3]:
+                lines.append(f"**🎁 空投 / 积分领取**")
                 lines.append("")
-                lines.append(f"> {desc}")
-                if url:
-                    lines.append(f"> 🔗 [来源链接]({url})")
+                lines.append(f"> {e.title[:55]}...")
+                lines.append(f"> 💡 若涉及领取/积分/质押，当下时间窗口内通常仍可操作。")
+                lines.append(f"> 🔗 [来源链接]({e.url})")
                 lines.append("")
+
+        # ---- 3. 新上线/发行：当下可认购、可交互 ----
+        launch_kw = ["mainnet", "主网", "launch", "tge", "公募", "发行",
+                     "listing", "上币", "public sale", "mint", "铸造"]
+        launch_events = [
+            e for e in events
+            if rwa_relevant(e) and any(k in text(e) for k in launch_kw)
+        ]
+        if launch_events:
+            for e in launch_events[:3]:
+                lines.append(f"**🚀 新上线 / 发行（可当下参与）**")
+                lines.append("")
+                lines.append(f"> {e.title[:55]}...")
+                lines.append(f"> 💡 主网上线/公募/上币刚发生或临近，参与门槛和早期机会正处窗口。")
+                lines.append(f"> 🔗 [来源链接]({e.url})")
+                lines.append("")
+
+        # ---- 4. 关注协议的当下利率/收益变化 ----
+        rate_kw = ["利率", "收益", "apy", "apr", "yield", "流动性激励", "%"]
+        rate_events = [e for e in events if e.matched_protocols and any(k in text(e) for k in rate_kw)]
+        if rate_events:
+            for e in rate_events[:2]:
+                lines.append(f"**📈 关注协议收益变化（{e.matched_protocols[0]}）**")
+                lines.append("")
+                lines.append(f"> {e.title[:55]}...")
+                lines.append(f"> 💡 关注协议存在收益/利率相关变动，可结合链上实际APY横向比对。")
+                lines.append(f"> 🔗 [来源链接]({e.url})")
+                lines.append("")
+
+        if not yield_hits and not airdrop_events and not launch_events and not rate_events:
+            lines.append("- 本期未识别到明确的「当下可套利」机会，建议关注收益型产品收益率变化与新上线项目。")
 
         lines.append("---")
         lines.append("")
-        lines.append("> ⚠️ 以上机会基于公开信息规则自动识别，可能存在滞后或误判，请在参与前自行核实项目真实性与合规性。")
+        lines.append("> ⚠️ 以上为规则自动识别的当下机会线索，接入前请亲自核实协议真实性、盈亏结构与合规性。")
+        lines.append("")
+
+        return "\n".join(lines)
+
+    def _generate_industry_overview(
+        self,
+        events: List[NewsEvent],
+        trend_summary: Dict[str, Any]
+    ) -> str:
+        """生成RWA 现状与产业透视板块 - 让用户感受当下/分析/发展阶段"""
+        from collections import Counter
+
+        def text(e):
+            return (e.title + " " + e.summary + " " + e.raw_content).lower()
+
+        lines = []
+        lines.append("## 🌐 RWA 现状与产业透视")
+        lines.append("")
+        lines.append("> 不是罗列新闻，而是基于本期数据看 RWA 行业「现在处于什么阶段、在往哪走」")
+        lines.append("")
+
+        # ===== 数据基准 =====
+        high = [e for e in events if e.importance == "high"]
+        medium = [e for e in events if e.importance == "medium"]
+        funding_events = [e for e in events if e.funding_amount and e.funding_amount > 0]
+        total_funding = sum(e.funding_amount or 0 for e in funding_events)
+        big_inst = self.config["IMPORTANCE_RULES"]["BIG_INSTITUTIONS"]
+        inst_events = [
+            e for e in events if any(i.lower() in e.raw_content.lower() for i in big_inst)
+        ]
+        policy_events = [e for e in events if e.matched_regions]
+        tag_counter = Counter(t for e in events for t in e.tags)
+        top_tags = tag_counter.most_common(5)
+        watchlist = [p["name"] for p in self.config.get("WATCHLIST_PROTOCOLS", [])]
+        watch_hit = [e for e in events if e.matched_protocols]
+
+        # ===== 1. 现状判断 =====
+        lines.append("### 1️⃣ 当下所处阶段")
+        lines.append("")
+        stage_points = []
+        # 资本热度
+        if len(funding_events) >= 2 and total_funding >= 5000:
+            stage_points.append(
+                f"- 💰 **资本正在快速涌入**：本期 {len(funding_events)} 起融资、合计约 "
+                f"{self._fmt_money(total_funding)}，说明一级市场对 RWA 赛道的认可度在提升。"
+            )
+        else:
+            stage_points.append(
+                f"- 💰 **资本关注度中等**：本期 {len(funding_events)} 起融资（合计约 "
+                f"{self._fmt_money(total_funding) if total_funding else 0}），属正常节奏。"
+            )
+        # 机构参与
+        if len(inst_events) >= 1:
+            stage_points.append(
+                f"- 🏦 **机构由「观望」转向「落地」**：{len(inst_events)} 条涉及传统金融机构动态，"
+                f"说明 RWA 已走出纯加密圈，进入传统金融基础设施整合阶段。"
+            )
+        # 监管成熟度
+        if len(policy_events) >= 2:
+            stage_points.append(
+                f"- 🏛️ **监管框架在成形**：{len(policy_events)} 条涉及监管/政策，"
+                f"合规化是当下产业从「试点」走向「规模化」的关键前提。"
+            )
+        # 阶段结论
+        inst_score = len(inst_events)
+        policy_score = len(policy_events)
+        funding_score = len(funding_events)
+        total_score = inst_score * 2 + policy_score + funding_score
+        if total_score >= 8:
+            stage_point = ("🟢 **发展期+起步期衔接**：机构与监管同时发力，行业处于「合规化后的规模化前期」，"
+                           "机会多但格局尚未固化。")
+        elif total_score >= 5:
+            stage_point = ("🟡 **成长期**：基础设施与产品逐步完善，正处于「由概念到规模」的爬坡阶段，"
+                           "适合提前研究、择优布局。")
+        else:
+            stage_point = ("🔵 **萌芽期**：关注度尚有限，属于信息差较大的早期赛道，"
+                           "高风险高回报，需谨慎验证项目真实性。")
+        stage_points.append(f"- 📌 **综合判断**：{stage_point}")
+        lines.extend(stage_points)
+        lines.append("")
+
+        # ===== 2. 细分赛道进展 =====
+        lines.append("### 2️⃣ 细分赛道进展")
+        lines.append("")
+        sector_kw = {
+            "国债/货币基金": ["treasur", "t-bill", "国债", "money market", "货币市场", "buidl", "usdy"],
+            "稳定币": ["stablecoin", "稳定币", "usdc", "usdt", "usyc", "geniust"],
+            "私募信贷": ["credit", "信贷", "lending", "借贷", "private credit", "私募信贷"],
+            "房地产": ["real estate", "房地产", "regis", "房产"],
+            "股权/SECURITY": ["tokeniz", "代币化", "equity", "股权", "security", "证券", "stocks", "股票"],
+            "大宗商品/黄金": ["gold", "黄金", "commodity", "commodit", "商品", "oil", "原油"],
+        }
+        sector_count = Counter()
+        sector_sources = {}
+        for e in events:
+            t = text(e)
+            for sec, kws in sector_kw.items():
+                if any(k in t for k in kws):
+                    sector_count[sec] += 1
+                    sector_sources.setdefault(sec, []).append(e.title[:40])
+                    break
+        if sector_count:
+            for sec, cnt in sector_count.most_common(6):
+                example = "$" if not sector_sources.get(sec) else ""
+                # 找一个代表性标题
+                sample = sector_sources[sec][0] if sector_sources.get(sec) else "—"
+                lines.append(f"- **{sec}**：{cnt} 条动态 · 例：{sample}...")
+        else:
+            lines.append("- 本期细分赛道信号不明显。")
+        lines.append("")
+
+        # ===== 3. 参与者格局 =====
+        lines.append("### 3️⃣ 参与者格局")
+        lines.append("")
+        lines.append(f"- 🏛️ **传统机构**：本期 {len(inst_events)} 条动态进入视野（{'、'.join([i for i in big_inst[:4]])}等）")
+        if watch_hit:
+            hit_names = sorted({e.matched_protocols[0] for e in watch_hit})
+            lines.append(f"- 🔗 **原生RWA协议（你的关注列表）**：命中 {len(watch_hit)} 条，集中在 {', '.join(hit_names[:5])}")
+            lines.append(f"- ⚙️ 说明原生协议仍在抢跑，但机构入场带来新的竞争与做市资源")
+        lines.append("")
+
+        # ===== 4. 发展方向 / 看什么 =====
+        lines.append("### 4️⃣ 下一步怎么看")
+        lines.append("")
+        trending_up = trend_summary.get("trending_up", [])
+        if trending_up:
+            up = "、".join(f"`{t[0]}`" for t in trending_up[:3])
+            lines.append(f"- 📈 **叙事方向**：热度上升最快的是 {up}，若该叙事持续，相关细分将优先受益。")
+        direcs = []
+        if inst_events:
+            direcs.append("跟踪机构落地后的「产品化」进度（谁把叙事做成了真实规模）。")
+        if policy_events:
+            direcs.append("跟踪监管细则落地时间表（合规窗口=规模爆发的起点）。")
+        if funding_events:
+            direcs.append("跟踪本轮融资项目的后续产品路线与上币，判断二级承接力。")
+        if not direcs:
+            direcs.append("先确认信息真实性，再判断赛道是否值得进入。")
+        for i, d in enumerate(direcs[:3], 1):
+            lines.append(f"- {i}. {d}")
         lines.append("")
 
         return "\n".join(lines)
